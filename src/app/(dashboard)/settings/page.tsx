@@ -12,7 +12,8 @@ import {
   Bell,
   Star,
   Save,
-  Check
+  Check,
+  Settings
 } from 'lucide-react'
 
 export default function SettingsPage() {
