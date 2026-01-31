@@ -37,19 +37,19 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-stone-100 via-stone-50 to-teal-50/30 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center text-white text-2xl font-bold mx-auto mb-4">
+          <div className="w-16 h-16 bg-gradient-to-br from-teal-400 to-teal-600 rounded-2xl flex items-center justify-center text-white text-2xl font-bold mx-auto mb-4 shadow-lg shadow-teal-500/30">
             GP
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">Welcome back</h1>
-          <p className="text-gray-500 mt-1">Sign in to GP Solutions</p>
+          <h1 className="text-2xl font-bold text-stone-900">Welcome back</h1>
+          <p className="text-stone-500 mt-1">Sign in to GP Solutions</p>
         </div>
 
         {/* Login Form */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+        <div className="bg-white rounded-2xl shadow-xl shadow-stone-200/50 border border-stone-200/50 p-8">
           <form onSubmit={handleLogin} className="space-y-5">
             {error && (
               <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
@@ -110,7 +110,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="w-full py-3 bg-gradient-to-r from-teal-500 to-teal-600 text-white rounded-xl font-medium hover:from-teal-600 hover:to-teal-700 transition-all shadow-lg shadow-teal-500/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {loading && <Loader2 className="animate-spin" size={20} />}
               {loading ? 'Signing in...' : 'Sign in'}
@@ -118,9 +118,9 @@ export default function LoginPage() {
           </form>
 
           <div className="mt-6 text-center">
-            <p className="text-gray-600">
+            <p className="text-stone-600">
               Don't have an account?{' '}
-              <Link href="/signup" className="text-blue-600 font-medium hover:underline">
+              <Link href="/signup" className="text-teal-600 font-medium hover:text-teal-700">
                 Sign up
               </Link>
             </p>
@@ -128,8 +128,8 @@ export default function LoginPage() {
         </div>
 
         {/* Demo credentials */}
-        <div className="mt-6 p-4 bg-gray-50 rounded-xl border border-gray-200">
-          <p className="text-sm text-gray-600 text-center">
+        <div className="mt-6 p-4 bg-stone-100 rounded-xl border border-stone-200">
+          <p className="text-sm text-stone-600 text-center">
             <strong>Demo:</strong> Create a new account to get started
           </p>
         </div>
