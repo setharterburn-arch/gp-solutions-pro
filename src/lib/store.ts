@@ -30,7 +30,7 @@ export const useStore = create<AppState>()(
       user: null,
       setUser: (user) => set({ user }),
       
-      sidebarOpen: true,
+      sidebarOpen: false, // Default closed for mobile
       setSidebarOpen: (sidebarOpen) => set({ sidebarOpen }),
       
       settings: null,

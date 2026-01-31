@@ -1,29 +1,38 @@
 'use client'
 
-import { Bell, Search, Plus, User } from 'lucide-react'
+import { Bell, Search, Plus, User, Menu } from 'lucide-react'
 import { useStore } from '@/lib/store'
 import { cn } from '@/lib/utils'
 import Link from 'next/link'
 import { useState } from 'react'
 
 export function Header() {
-  const { sidebarOpen, user } = useStore()
+  const { sidebarOpen, setSidebarOpen, user } = useStore()
   const [showNotifications, setShowNotifications] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [showQuickAdd, setShowQuickAdd] = useState(false)
 
   return (
     <header className={cn(
-      'fixed top-0 right-0 z-30 h-16 bg-white border-b border-gray-200 transition-all duration-300',
-      sidebarOpen ? 'left-64' : 'left-20'
+      'fixed top-0 right-0 z-20 h-16 bg-white border-b border-gray-200 transition-all duration-300',
+      'left-0 lg:left-64',
+      !sidebarOpen && 'lg:left-20'
     )}>
-      <div className="flex items-center justify-between h-full px-6">
-        {/* Search */}
-        <div className="relative w-96">
+      <div className="flex items-center justify-between h-full px-4 lg:px-6">
+        {/* Mobile menu button */}
+        <button
+          onClick={() => setSidebarOpen(true)}
+          className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg lg:hidden"
+        >
+          <Menu size={24} />
+        </button>
+        
+        {/* Search - hidden on mobile */}
+        <div className="relative hidden md:block md:w-64 lg:w-96">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
           <input
             type="text"
-            placeholder="Search customers, jobs, invoices..."
+            placeholder="Search..."
             className="w-full pl-10 pr-4 py-2 bg-gray-100 border-0 rounded-lg focus:ring-2 focus:ring-blue-500 focus:bg-white"
           />
         </div>
