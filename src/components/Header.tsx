@@ -1,13 +1,15 @@
 'use client'
 
-import { Bell, Search, Plus, User, Menu } from 'lucide-react'
+import { Bell, Search, Plus, User, Menu, LogOut } from 'lucide-react'
 import { useStore } from '@/lib/store'
+import { useAuth } from '@/components/AuthProvider'
 import { cn } from '@/lib/utils'
 import Link from 'next/link'
 import { useState } from 'react'
 
 export function Header() {
   const { sidebarOpen, setSidebarOpen, user } = useStore()
+  const { signOut } = useAuth()
   const [showNotifications, setShowNotifications] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [showQuickAdd, setShowQuickAdd] = useState(false)
@@ -158,9 +160,10 @@ export function Header() {
                   Settings
                 </Link>
                 <button
-                  className="w-full text-left px-4 py-2 hover:bg-gray-100 text-red-600"
-                  onClick={() => {/* logout */}}
+                  className="w-full text-left px-4 py-2 hover:bg-gray-100 text-red-600 flex items-center gap-2"
+                  onClick={signOut}
                 >
+                  <LogOut size={16} />
                   Logout
                 </button>
               </div>
