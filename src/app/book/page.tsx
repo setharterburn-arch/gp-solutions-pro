@@ -392,7 +392,7 @@ export default function OnlineBooking() {
                 <div>
                   <p className="font-medium text-gray-900">{selectedService?.name}</p>
                   <p className="text-sm text-gray-500">{selectedService?.description}</p>
-                  {selectedService?.price !== null && (
+                  {selectedService && selectedService.price !== null && (
                     <p className="text-sm font-medium text-green-600 mt-1">
                       {selectedService.price === 0 ? 'Free' : `$${selectedService.price}`}
                     </p>
