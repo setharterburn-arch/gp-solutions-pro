@@ -156,13 +156,22 @@ export default function InvoicesPage() {
           <h1 className="text-2xl font-bold text-gray-900">Invoices</h1>
           <p className="text-gray-500">Manage invoices and track payments</p>
         </div>
-        <Link
-          href="/invoices/new"
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          <Plus size={20} />
-          New Invoice
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/invoices/batch"
+            className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            <Receipt size={20} />
+            Batch Invoice
+          </Link>
+          <Link
+            href="/invoices/new"
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <Plus size={20} />
+            New Invoice
+          </Link>
+        </div>
       </div>
 
       {/* Stats */}
