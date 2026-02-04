@@ -10,6 +10,8 @@ interface AppState {
   // UI
   sidebarOpen: boolean
   setSidebarOpen: (open: boolean) => void
+  sidebarCollapsed: boolean
+  setSidebarCollapsed: (collapsed: boolean) => void
   
   // Settings
   settings: Settings | null
@@ -32,6 +34,8 @@ export const useStore = create<AppState>()(
       
       sidebarOpen: false, // Default closed for mobile
       setSidebarOpen: (sidebarOpen) => set({ sidebarOpen }),
+      sidebarCollapsed: false, // Desktop sidebar collapse state
+      setSidebarCollapsed: (sidebarCollapsed) => set({ sidebarCollapsed }),
       
       settings: null,
       setSettings: (settings) => set({ settings }),
@@ -46,7 +50,10 @@ export const useStore = create<AppState>()(
     }),
     {
       name: 'gp-solutions-storage',
-      partialize: (state) => ({ sidebarOpen: state.sidebarOpen })
+      partialize: (state) => ({ 
+        sidebarOpen: state.sidebarOpen,
+        sidebarCollapsed: state.sidebarCollapsed 
+      })
     }
   )
 )
