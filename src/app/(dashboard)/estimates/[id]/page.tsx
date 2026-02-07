@@ -1,26 +1,27 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { 
   ArrowLeft, 
   Edit,
-  Send,
   Download,
   Printer,
   CheckCircle,
   XCircle,
-  FileText
+  FileText,
+  Loader2
 } from 'lucide-react'
 import { formatCurrency, getStatusColor, formatDate } from '@/lib/utils'
+import { supabase } from '@/lib/supabase'
 
 interface LineItem {
   id: string
   description: string
   quantity: number
-  rate: number
-  amount: number
+  unit_price: number
+  total: number
 }
 
 interface Estimate {
@@ -44,34 +45,113 @@ export default function EstimateDetailPage() {
   const router = useRouter()
   const [estimate, setEstimate] = useState<Estimate | null>(null)
   const [loading, setLoading] = useState(true)
+  const [generating, setGenerating] = useState(false)
+  const printRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    // Mock data
-    setEstimate({
-      id: params.id as string,
-      number: 'EST-001',
-      status: 'sent',
-      customer_name: 'John Smith',
-      customer_email: 'john@example.com',
-      customer_address: '123 Main St, Springfield, IL 62701',
-      date: '2026-02-01',
-      valid_until: '2026-03-01',
-      items: [
-        { id: '1', description: 'HVAC System Installation', quantity: 1, rate: 4500, amount: 4500 },
-        { id: '2', description: 'Ductwork Modification', quantity: 1, rate: 800, amount: 800 },
-        { id: '3', description: 'Permit & Inspection Fees', quantity: 1, rate: 200, amount: 200 },
-      ],
-      subtotal: 5500,
-      tax: 440,
-      total: 5940,
-      notes: 'Installation includes 2-year warranty on labor. Equipment warranty handled by manufacturer.'
-    })
-    setLoading(false)
+    async function fetchEstimate() {
+      try {
+        const { data, error } = await supabase
+          .from('estimates')
+          .select(`
+            *,
+            customers (
+              name,
+              email,
+              address,
+              city,
+              state,
+              zip
+            )
+          `)
+          .eq('id', params.id)
+          .single()
+
+        if (error) throw error
+
+        const customer = data.customers
+        const customerAddress = [customer?.address, customer?.city, customer?.state, customer?.zip].filter(Boolean).join(', ')
+
+        setEstimate({
+          id: data.id,
+          number: `EST-${data.id.slice(0, 8).toUpperCase()}`,
+          status: data.status,
+          customer_name: customer?.name || 'Unknown',
+          customer_email: customer?.email || '',
+          customer_address: customerAddress,
+          date: data.created_at,
+          valid_until: data.valid_until,
+          items: data.line_items || [],
+          subtotal: data.subtotal,
+          tax: data.tax_amount,
+          total: data.total,
+          notes: data.notes || ''
+        })
+      } catch (error) {
+        console.error('Error fetching estimate:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchEstimate()
   }, [params.id])
 
-  const updateStatus = (newStatus: string) => {
+  const updateStatus = async (newStatus: string) => {
     if (!estimate) return
-    setEstimate({ ...estimate, status: newStatus })
+    
+    try {
+      const { error } = await supabase
+        .from('estimates')
+        .update({ status: newStatus })
+        .eq('id', estimate.id)
+
+      if (error) throw error
+      setEstimate({ ...estimate, status: newStatus })
+    } catch (error) {
+      console.error('Error updating status:', error)
+    }
+  }
+
+  const downloadPDF = async () => {
+    if (!printRef.current || !estimate) return
+    
+    setGenerating(true)
+    
+    try {
+      const html2canvas = (await import('html2canvas')).default
+      const jsPDF = (await import('jspdf')).default
+
+      const canvas = await html2canvas(printRef.current, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff'
+      })
+
+      const imgData = canvas.toDataURL('image/png')
+      const pdf = new jsPDF('p', 'mm', 'a4')
+      
+      const pdfWidth = pdf.internal.pageSize.getWidth()
+      const pdfHeight = pdf.internal.pageSize.getHeight()
+      const imgWidth = canvas.width
+      const imgHeight = canvas.height
+      const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight)
+      const imgX = (pdfWidth - imgWidth * ratio) / 2
+      const imgY = 10
+
+      pdf.addImage(imgData, 'PNG', imgX, imgY, imgWidth * ratio, imgHeight * ratio)
+      pdf.save(`Estimate-${estimate.number}.pdf`)
+    } catch (error) {
+      console.error('Error generating PDF:', error)
+      alert('Failed to generate PDF. Please try again.')
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  const handlePrint = () => {
+    window.print()
   }
 
   const convertToJob = () => {
@@ -92,12 +172,19 @@ export default function EstimateDetailPage() {
     )
   }
 
-  if (!estimate) return null
+  if (!estimate) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-gray-500">Estimate not found</p>
+        <Link href="/estimates" className="text-blue-600 hover:underline">Back to estimates</Link>
+      </div>
+    )
+  }
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Header */}
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between print:hidden">
         <div className="flex items-center gap-4">
           <Link href="/estimates" className="p-2 hover:bg-gray-100 rounded-lg">
             <ArrowLeft size={20} />
@@ -121,21 +208,21 @@ export default function EstimateDetailPage() {
       </div>
 
       {/* Actions */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 print:hidden">
         <div className="flex flex-wrap gap-2">
           {estimate.status === 'draft' && (
             <button
               onClick={() => updateStatus('sent')}
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
             >
-              <Send size={18} />
-              Send Estimate
+              <CheckCircle size={18} />
+              Mark as Sent
             </button>
           )}
           {estimate.status === 'sent' && (
             <>
               <button
-                onClick={() => updateStatus('accepted')}
+                onClick={() => updateStatus('approved')}
                 className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
               >
                 <CheckCircle size={18} />
@@ -150,7 +237,7 @@ export default function EstimateDetailPage() {
               </button>
             </>
           )}
-          {estimate.status === 'accepted' && (
+          {estimate.status === 'approved' && (
             <>
               <button
                 onClick={convertToJob}
@@ -168,11 +255,18 @@ export default function EstimateDetailPage() {
               </button>
             </>
           )}
-          <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50">
-            <Download size={18} />
-            Download PDF
+          <button 
+            onClick={downloadPDF}
+            disabled={generating}
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+          >
+            {generating ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
+            {generating ? 'Generating...' : 'Download PDF'}
           </button>
-          <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50">
+          <button 
+            onClick={handlePrint}
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50"
+          >
             <Printer size={18} />
             Print
           </button>
@@ -180,7 +274,7 @@ export default function EstimateDetailPage() {
       </div>
 
       {/* Estimate Preview */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
+      <div ref={printRef} className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 print:shadow-none print:border-none">
         {/* Header */}
         <div className="flex justify-between mb-8">
           <div>
@@ -199,18 +293,20 @@ export default function EstimateDetailPage() {
           <div>
             <p className="text-sm font-medium text-gray-500 mb-1">PREPARED FOR</p>
             <p className="font-medium text-gray-900">{estimate.customer_name}</p>
-            <p className="text-gray-600">{estimate.customer_email}</p>
-            <p className="text-gray-600">{estimate.customer_address}</p>
+            {estimate.customer_email && <p className="text-gray-600">{estimate.customer_email}</p>}
+            {estimate.customer_address && <p className="text-gray-600">{estimate.customer_address}</p>}
           </div>
           <div className="text-right">
             <div className="mb-2">
               <p className="text-sm font-medium text-gray-500">DATE</p>
               <p className="text-gray-900">{formatDate(estimate.date)}</p>
             </div>
-            <div>
-              <p className="text-sm font-medium text-gray-500">VALID UNTIL</p>
-              <p className="text-gray-900">{formatDate(estimate.valid_until)}</p>
-            </div>
+            {estimate.valid_until && (
+              <div>
+                <p className="text-sm font-medium text-gray-500">VALID UNTIL</p>
+                <p className="text-gray-900">{formatDate(estimate.valid_until)}</p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -225,12 +321,12 @@ export default function EstimateDetailPage() {
             </tr>
           </thead>
           <tbody>
-            {estimate.items.map((item) => (
-              <tr key={item.id} className="border-b border-gray-100">
+            {estimate.items.map((item, index) => (
+              <tr key={item.id || index} className="border-b border-gray-100">
                 <td className="py-4 text-gray-900">{item.description}</td>
                 <td className="py-4 text-right text-gray-600">{item.quantity}</td>
-                <td className="py-4 text-right text-gray-600">{formatCurrency(item.rate)}</td>
-                <td className="py-4 text-right text-gray-900">{formatCurrency(item.amount)}</td>
+                <td className="py-4 text-right text-gray-600">{formatCurrency(item.unit_price || item.rate)}</td>
+                <td className="py-4 text-right text-gray-900">{formatCurrency(item.total || item.amount)}</td>
               </tr>
             ))}
           </tbody>
@@ -243,10 +339,12 @@ export default function EstimateDetailPage() {
               <span className="text-gray-600">Subtotal</span>
               <span className="text-gray-900">{formatCurrency(estimate.subtotal)}</span>
             </div>
-            <div className="flex justify-between py-2">
-              <span className="text-gray-600">Tax (8%)</span>
-              <span className="text-gray-900">{formatCurrency(estimate.tax)}</span>
-            </div>
+            {estimate.tax > 0 && (
+              <div className="flex justify-between py-2">
+                <span className="text-gray-600">Tax</span>
+                <span className="text-gray-900">{formatCurrency(estimate.tax)}</span>
+              </div>
+            )}
             <div className="flex justify-between py-3 border-t border-gray-200 font-bold">
               <span className="text-gray-900">Total</span>
               <span className="text-gray-900">{formatCurrency(estimate.total)}</span>
@@ -258,7 +356,7 @@ export default function EstimateDetailPage() {
         {estimate.notes && (
           <div className="mt-8 pt-8 border-t border-gray-200">
             <p className="text-sm font-medium text-gray-500 mb-1">NOTES & TERMS</p>
-            <p className="text-gray-600">{estimate.notes}</p>
+            <p className="text-gray-600 whitespace-pre-wrap">{estimate.notes}</p>
           </div>
         )}
       </div>

@@ -8,7 +8,6 @@ import {
   Plus, 
   Trash2, 
   Save, 
-  Send,
   User,
   Calendar,
   FileText,
@@ -195,7 +194,7 @@ export default function NewEstimatePage() {
           </Link>
           <div>
             <h1 className="text-2xl font-bold text-gray-900">New Estimate</h1>
-            <p className="text-gray-500">Create and send a quote to your customer</p>
+            <p className="text-gray-500">Create a quote for your customer</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -208,12 +207,12 @@ export default function NewEstimatePage() {
             Save Draft
           </button>
           <button
-            onClick={() => handleSave(true)}
+            onClick={() => handleSave(false)}
             disabled={saving}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
           >
-            <Send size={20} />
-            {saving ? 'Saving...' : 'Save & Send'}
+            <Save size={20} />
+            {saving ? 'Saving...' : 'Save Estimate'}
           </button>
         </div>
       </div>
