@@ -142,49 +142,145 @@ export default function InvoiceDetailPage() {
   }
 
   const downloadPDF = async () => {
-    if (!printRef.current || !invoice) return
+    if (!invoice) return
     
     setGenerating(true)
     
     try {
-      // Dynamic imports
-      const [html2canvasModule, jspdfModule] = await Promise.all([
-        import('html2canvas'),
-        import('jspdf')
-      ])
-      
-      const html2canvas = html2canvasModule.default
+      const jspdfModule = await import('jspdf')
       const jsPDF = jspdfModule.default
 
-      // Wait a tick for any pending renders
-      await new Promise(resolve => setTimeout(resolve, 100))
+      const pdf = new jsPDF('p', 'mm', 'a4')
+      const pageWidth = pdf.internal.pageSize.getWidth()
+      let y = 20
 
-      const canvas = await html2canvas(printRef.current, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        backgroundColor: '#ffffff',
-        allowTaint: true,
-        foreignObjectRendering: false
+      // Company Header
+      pdf.setFontSize(20)
+      pdf.setFont('helvetica', 'bold')
+      pdf.text(companyInfo.name, 20, y)
+      y += 7
+      
+      if (companyInfo.address) {
+        pdf.setFontSize(10)
+        pdf.setFont('helvetica', 'normal')
+        pdf.text(companyInfo.address, 20, y)
+        y += 5
+      }
+
+      // INVOICE title on right
+      pdf.setFontSize(24)
+      pdf.setFont('helvetica', 'bold')
+      pdf.text('INVOICE', pageWidth - 20, 20, { align: 'right' })
+      pdf.setFontSize(10)
+      pdf.setFont('helvetica', 'normal')
+      pdf.text(invoice.number, pageWidth - 20, 27, { align: 'right' })
+
+      y = Math.max(y, 40)
+
+      // Divider line
+      pdf.setDrawColor(200)
+      pdf.line(20, y, pageWidth - 20, y)
+      y += 10
+
+      // Customer info
+      pdf.setFontSize(9)
+      pdf.setFont('helvetica', 'bold')
+      pdf.text('BILL TO', 20, y)
+      pdf.text('INVOICE DATE', pageWidth - 60, y)
+      y += 5
+      
+      pdf.setFont('helvetica', 'normal')
+      pdf.text(invoice.customer_name, 20, y)
+      pdf.text(formatDate(invoice.date), pageWidth - 60, y)
+      y += 5
+      
+      if (invoice.customer_address) {
+        pdf.text(invoice.customer_address, 20, y)
+      }
+      if (invoice.due_date) {
+        pdf.setFont('helvetica', 'bold')
+        pdf.text('DUE DATE', pageWidth - 60, y)
+        y += 5
+        pdf.setFont('helvetica', 'normal')
+        pdf.text(formatDate(invoice.due_date), pageWidth - 60, y)
+      }
+      y += 15
+
+      // Table header
+      pdf.setFillColor(245, 245, 245)
+      pdf.rect(20, y - 3, pageWidth - 40, 8, 'F')
+      pdf.setFont('helvetica', 'bold')
+      pdf.setFontSize(9)
+      pdf.text('DESCRIPTION', 22, y + 2)
+      pdf.text('QTY', pageWidth - 80, y + 2, { align: 'right' })
+      pdf.text('RATE', pageWidth - 50, y + 2, { align: 'right' })
+      pdf.text('AMOUNT', pageWidth - 22, y + 2, { align: 'right' })
+      y += 10
+
+      // Line items
+      pdf.setFont('helvetica', 'normal')
+      invoice.items.forEach((item) => {
+        pdf.text(item.description || '', 22, y)
+        pdf.text(String(item.quantity || 1), pageWidth - 80, y, { align: 'right' })
+        pdf.text(formatCurrency(item.unit_price || item.rate || 0), pageWidth - 50, y, { align: 'right' })
+        pdf.text(formatCurrency(item.total || item.amount || 0), pageWidth - 22, y, { align: 'right' })
+        y += 7
       })
 
-      const imgData = canvas.toDataURL('image/jpeg', 0.95)
-      const pdf = new jsPDF('p', 'mm', 'a4')
-      
-      const pdfWidth = pdf.internal.pageSize.getWidth()
-      const pdfHeight = pdf.internal.pageSize.getHeight()
-      const imgWidth = canvas.width
-      const imgHeight = canvas.height
-      const ratio = Math.min((pdfWidth - 20) / imgWidth, (pdfHeight - 20) / imgHeight)
-      const imgX = (pdfWidth - imgWidth * ratio) / 2
-      const imgY = 10
+      y += 5
+      pdf.line(20, y, pageWidth - 20, y)
+      y += 10
 
-      pdf.addImage(imgData, 'JPEG', imgX, imgY, imgWidth * ratio, imgHeight * ratio)
+      // Totals
+      pdf.text('Subtotal', pageWidth - 60, y)
+      pdf.text(formatCurrency(invoice.subtotal), pageWidth - 22, y, { align: 'right' })
+      y += 7
+
+      if (invoice.tax > 0) {
+        pdf.text('Tax', pageWidth - 60, y)
+        pdf.text(formatCurrency(invoice.tax), pageWidth - 22, y, { align: 'right' })
+        y += 7
+      }
+
+      pdf.setFont('helvetica', 'bold')
+      pdf.text('Total', pageWidth - 60, y)
+      pdf.text(formatCurrency(invoice.total), pageWidth - 22, y, { align: 'right' })
+      y += 7
+
+      if (invoice.amount_paid > 0) {
+        pdf.setFont('helvetica', 'normal')
+        pdf.setTextColor(34, 197, 94) // green
+        pdf.text('Paid', pageWidth - 60, y)
+        pdf.text(formatCurrency(invoice.amount_paid), pageWidth - 22, y, { align: 'right' })
+        y += 7
+        pdf.setTextColor(0, 0, 0) // reset
+      }
+
+      const amountDue = invoice.total - invoice.amount_paid
+      if (amountDue > 0) {
+        pdf.setFont('helvetica', 'bold')
+        pdf.setTextColor(59, 130, 246) // blue
+        pdf.text('Amount Due', pageWidth - 60, y)
+        pdf.text(formatCurrency(amountDue), pageWidth - 22, y, { align: 'right' })
+        pdf.setTextColor(0, 0, 0) // reset
+      }
+
+      // Notes
+      if (invoice.notes) {
+        y += 20
+        pdf.setFont('helvetica', 'bold')
+        pdf.setFontSize(9)
+        pdf.text('NOTES', 20, y)
+        y += 5
+        pdf.setFont('helvetica', 'normal')
+        const noteLines = pdf.splitTextToSize(invoice.notes, pageWidth - 40)
+        pdf.text(noteLines, 20, y)
+      }
+
       pdf.save(`Invoice-${invoice.number}.pdf`)
     } catch (error: any) {
       console.error('Error generating PDF:', error)
-      // Fallback to print
-      alert('PDF generation failed. Opening print dialog instead.')
+      alert('PDF generation failed. Please use Print instead.')
       window.print()
     } finally {
       setGenerating(false)
