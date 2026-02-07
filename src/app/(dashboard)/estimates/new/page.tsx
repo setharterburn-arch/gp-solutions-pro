@@ -16,6 +16,7 @@ import {
   Clock
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
+import { supabase } from '@/lib/supabase'
 
 interface LineItem {
   id: string
@@ -28,9 +29,11 @@ interface LineItem {
 interface Customer {
   id: string
   name: string
-  email: string
-  phone: string
-  address: string
+  email: string | null
+  phone: string | null
+  address: string | null
+  city: string | null
+  state: string | null
 }
 
 export default function NewEstimatePage() {
@@ -56,30 +59,35 @@ export default function NewEstimatePage() {
     { id: '1', description: '', quantity: 1, rate: 0, total: 0 }
   ])
 
-  // Mock customers - replace with API call
   useEffect(() => {
-    setCustomers([
-      { id: '1', name: 'John Smith', email: 'john@example.com', phone: '555-0101', address: '123 Main St, City, ST 12345' },
-      { id: '2', name: 'Tech Corp Inc.', email: 'service@techcorp.com', phone: '555-0102', address: '456 Business Ave, City, ST 12345' },
-      { id: '3', name: 'Jane Doe', email: 'jane@example.com', phone: '555-0103', address: '789 Oak Rd, City, ST 12345' },
-      { id: '4', name: 'Bob Wilson', email: 'bob@example.com', phone: '555-0104', address: '321 Elm St, City, ST 12345' },
-      { id: '5', name: 'Alice Brown', email: 'alice@example.com', phone: '555-0105', address: '654 Pine Ln, City, ST 12345' },
-    ])
+    async function fetchCustomers() {
+      const { data, error } = await supabase
+        .from('customers')
+        .select('id, name, email, phone, address, city, state')
+        .eq('status', 'active')
+        .order('name')
+      
+      if (!error && data) {
+        setCustomers(data)
+      }
+    }
+    fetchCustomers()
   }, [])
 
   const filteredCustomers = customers.filter(c => 
     c.name.toLowerCase().includes(customerSearch.toLowerCase()) ||
-    c.email.toLowerCase().includes(customerSearch.toLowerCase())
+    (c.email && c.email.toLowerCase().includes(customerSearch.toLowerCase()))
   )
 
   const selectCustomer = (customer: Customer) => {
+    const fullAddress = [customer.address, customer.city, customer.state].filter(Boolean).join(', ')
     setEstimate({
       ...estimate,
       customer_id: customer.id,
       customer_name: customer.name,
-      customer_email: customer.email,
-      customer_phone: customer.phone,
-      customer_address: customer.address,
+      customer_email: customer.email || '',
+      customer_phone: customer.phone || '',
+      customer_address: fullAddress,
     })
     setShowCustomerSearch(false)
     setCustomerSearch('')

@@ -14,6 +14,7 @@ import {
   DollarSign
 } from 'lucide-react'
 import { formatCurrency, getStatusColor } from '@/lib/utils'
+import { supabase } from '@/lib/supabase'
 
 interface Customer {
   id: string
@@ -34,67 +35,35 @@ export default function CustomersPage() {
   const [customers, setCustomers] = useState<Customer[]>([])
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Mock data - replace with API call
-    setCustomers([
-      {
-        id: '1',
-        name: 'John Smith',
-        email: 'john@example.com',
-        phone: '(555) 123-4567',
-        address: '123 Main St',
-        city: 'Springfield',
-        state: 'IL',
-        status: 'active',
-        tags: ['residential', 'vip'],
-        total_jobs: 12,
-        total_revenue: 4580,
-        created_at: '2025-06-15'
-      },
-      {
-        id: '2',
-        name: 'Jane Doe',
-        email: 'jane@example.com',
-        phone: '(555) 234-5678',
-        address: '456 Oak Ave',
-        city: 'Springfield',
-        state: 'IL',
-        status: 'active',
-        tags: ['residential'],
-        total_jobs: 5,
-        total_revenue: 1250,
-        created_at: '2025-08-20'
-      },
-      {
-        id: '3',
-        name: 'Tech Corp Inc.',
-        email: 'service@techcorp.com',
-        phone: '(555) 345-6789',
-        address: '789 Business Blvd',
-        city: 'Springfield',
-        state: 'IL',
-        status: 'active',
-        tags: ['commercial', 'contract'],
-        total_jobs: 24,
-        total_revenue: 15800,
-        created_at: '2025-03-10'
-      },
-      {
-        id: '4',
-        name: 'Bob Wilson',
-        email: 'bob@example.com',
-        phone: '(555) 456-7890',
-        address: '321 Elm St',
-        city: 'Springfield',
-        state: 'IL',
-        status: 'inactive',
-        tags: ['residential'],
-        total_jobs: 2,
-        total_revenue: 450,
-        created_at: '2025-11-05'
-      },
-    ])
+    async function fetchCustomers() {
+      try {
+        const { data, error } = await supabase
+          .from('customers')
+          .select('*')
+          .order('created_at', { ascending: false })
+
+        if (error) throw error
+        
+        // Add default values for computed fields
+        const customersWithDefaults = (data || []).map(c => ({
+          ...c,
+          tags: c.tags || [],
+          total_jobs: 0,
+          total_revenue: 0
+        }))
+        
+        setCustomers(customersWithDefaults)
+      } catch (error) {
+        console.error('Error fetching customers:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    fetchCustomers()
   }, [])
 
   const filteredCustomers = customers.filter(customer => {

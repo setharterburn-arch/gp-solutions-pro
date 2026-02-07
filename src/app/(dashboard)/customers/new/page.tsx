@@ -13,6 +13,7 @@ import {
   Phone,
   MapPin
 } from 'lucide-react'
+import { supabase } from '@/lib/supabase'
 
 interface ContactPerson {
   id: string
@@ -111,15 +112,29 @@ export default function NewCustomerPage() {
     setLoading(true)
 
     try {
-      // TODO: API call to create customer
-      console.log('Creating customer:', { ...formData, type: customerType })
-      
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 500))
+      const { data, error } = await supabase
+        .from('customers')
+        .insert({
+          name: customerType === 'commercial' ? formData.company_name : formData.name,
+          email: formData.email || null,
+          phone: formData.phone || null,
+          address: formData.address || null,
+          city: formData.city || null,
+          state: formData.state || null,
+          zip: formData.zip || null,
+          notes: formData.notes || null,
+          tags: formData.tags,
+          status: 'active'
+        })
+        .select()
+        .single()
+
+      if (error) throw error
       
       router.push('/customers')
     } catch (error) {
       console.error('Error creating customer:', error)
+      alert('Failed to create customer. Please try again.')
     } finally {
       setLoading(false)
     }

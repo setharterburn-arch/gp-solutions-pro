@@ -13,12 +13,15 @@ import {
   User,
   MapPin
 } from 'lucide-react'
+import { supabase } from '@/lib/supabase'
 
 interface Customer {
   id: string
   name: string
-  phone: string
-  address: string
+  phone: string | null
+  address: string | null
+  city: string | null
+  state: string | null
 }
 
 interface ChecklistItem {
@@ -60,12 +63,18 @@ export default function NewJobPage() {
   })
 
   useEffect(() => {
-    // Mock data - replace with API calls
-    setCustomers([
-      { id: '1', name: 'John Smith', phone: '(555) 123-4567', address: '123 Main St, Springfield' },
-      { id: '2', name: 'Jane Doe', phone: '(555) 234-5678', address: '456 Oak Ave, Springfield' },
-      { id: '3', name: 'Bob Wilson', phone: '(555) 345-6789', address: '789 Pine Rd, Springfield' },
-    ])
+    async function fetchCustomers() {
+      const { data, error } = await supabase
+        .from('customers')
+        .select('id, name, phone, address, city, state')
+        .eq('status', 'active')
+        .order('name')
+      
+      if (!error && data) {
+        setCustomers(data)
+      }
+    }
+    fetchCustomers()
 
     setJobTypes([
       { 
@@ -216,7 +225,7 @@ export default function NewJobPage() {
                 <option value="">Choose a customer...</option>
                 {customers.map((customer) => (
                   <option key={customer.id} value={customer.id}>
-                    {customer.name} - {customer.phone}
+                    {customer.name}{customer.phone ? ` - ${customer.phone}` : ''}
                   </option>
                 ))}
               </select>
@@ -228,11 +237,13 @@ export default function NewJobPage() {
                   <User className="text-gray-400 mt-1" size={18} />
                   <div>
                     <p className="font-medium text-gray-900">{selectedCustomer.name}</p>
-                    <p className="text-sm text-gray-500">{selectedCustomer.phone}</p>
-                    <p className="text-sm text-gray-500 flex items-center gap-1 mt-1">
-                      <MapPin size={12} />
-                      {selectedCustomer.address}
-                    </p>
+                    {selectedCustomer.phone && <p className="text-sm text-gray-500">{selectedCustomer.phone}</p>}
+                    {selectedCustomer.address && (
+                      <p className="text-sm text-gray-500 flex items-center gap-1 mt-1">
+                        <MapPin size={12} />
+                        {selectedCustomer.address}{selectedCustomer.city ? `, ${selectedCustomer.city}` : ''}{selectedCustomer.state ? `, ${selectedCustomer.state}` : ''}
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
