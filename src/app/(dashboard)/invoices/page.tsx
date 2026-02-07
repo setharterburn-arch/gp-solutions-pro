@@ -14,6 +14,7 @@ import {
   CheckCircle
 } from 'lucide-react'
 import { formatDate, formatCurrency, getStatusColor } from '@/lib/utils'
+import { supabase } from '@/lib/supabase'
 
 interface Invoice {
   id: string
@@ -43,76 +44,57 @@ export default function InvoicesPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Mock data - replace with API call
-    setInvoices([
-      {
-        id: '1',
-        invoice_number: 'INV-2601-0001',
-        customer_name: 'John Smith',
-        customer_email: 'john@example.com',
-        job_title: 'HVAC Maintenance',
-        total: 450,
-        amount_paid: 450,
-        status: 'paid',
-        due_date: '2026-02-15',
-        sent_at: '2026-01-20',
-        created_at: '2026-01-20'
-      },
-      {
-        id: '2',
-        invoice_number: 'INV-2601-0002',
-        customer_name: 'Tech Corp Inc.',
-        customer_email: 'service@techcorp.com',
-        job_title: 'Commercial AC Repair',
-        total: 1250,
-        amount_paid: 0,
-        status: 'sent',
-        due_date: '2026-02-20',
-        sent_at: '2026-01-25',
-        created_at: '2026-01-25'
-      },
-      {
-        id: '3',
-        invoice_number: 'INV-2601-0003',
-        customer_name: 'Jane Doe',
-        customer_email: 'jane@example.com',
-        job_title: 'Furnace Repair',
-        total: 350,
-        amount_paid: 0,
-        status: 'overdue',
-        due_date: '2026-01-25',
-        sent_at: '2026-01-10',
-        created_at: '2026-01-10'
-      },
-      {
-        id: '4',
-        invoice_number: 'INV-2601-0004',
-        customer_name: 'Bob Wilson',
-        customer_email: 'bob@example.com',
-        job_title: 'New Installation',
-        total: 4500,
-        amount_paid: 2250,
-        status: 'partial',
-        due_date: '2026-02-28',
-        sent_at: '2026-01-28',
-        created_at: '2026-01-28'
-      },
-      {
-        id: '5',
-        invoice_number: 'INV-2601-0005',
-        customer_name: 'Alice Brown',
-        customer_email: 'alice@example.com',
-        job_title: 'Inspection',
-        total: 89,
-        amount_paid: 0,
-        status: 'draft',
-        due_date: '2026-02-15',
-        sent_at: null,
-        created_at: '2026-01-30'
-      },
-    ])
+    async function fetchInvoices() {
+      try {
+        const { data, error } = await supabase
+          .from('invoices')
+          .select(`
+            id,
+            invoice_number,
+            total,
+            amount_paid,
+            status,
+            due_date,
+            sent_at,
+            created_at,
+            customers (
+              name,
+              email
+            ),
+            jobs (
+              title
+            )
+          `)
+          .order('created_at', { ascending: false })
+
+        if (error) throw error
+
+        const formattedInvoices = (data || []).map(inv => ({
+          id: inv.id,
+          invoice_number: inv.invoice_number,
+          customer_name: inv.customers?.name || 'Unknown',
+          customer_email: inv.customers?.email || '',
+          job_title: inv.jobs?.title || null,
+          total: inv.total,
+          amount_paid: inv.amount_paid,
+          status: inv.status,
+          due_date: inv.due_date,
+          sent_at: inv.sent_at,
+          created_at: inv.created_at
+        }))
+
+        setInvoices(formattedInvoices)
+      } catch (error) {
+        console.error('Error fetching invoices:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchInvoices()
   }, [])
 
   const filteredInvoices = invoices.filter(invoice => {

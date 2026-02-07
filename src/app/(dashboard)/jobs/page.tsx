@@ -16,6 +16,7 @@ import {
   Calendar
 } from 'lucide-react'
 import { formatDate, formatTime, formatCurrency, getStatusColor, getPriorityColor } from '@/lib/utils'
+import { supabase } from '@/lib/supabase'
 
 interface Job {
   id: string
@@ -46,81 +47,62 @@ export default function JobsPage() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [showFilters, setShowFilters] = useState(false)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Mock data - replace with API call
-    setJobs([
-      {
-        id: '1',
-        title: 'HVAC Maintenance',
-        customer_name: 'John Smith',
-        customer_phone: '(555) 123-4567',
-        customer_address: '123 Main St, Springfield, IL',
-        scheduled_date: '2026-01-31',
-        scheduled_time: '09:00',
-        status: 'scheduled',
-        priority: 'normal',
-        price: 150,
-        job_type: 'Maintenance',
-        assigned_to: ['Mike Johnson']
-      },
-      {
-        id: '2',
-        title: 'AC Repair - No Cooling',
-        customer_name: 'Jane Doe',
-        customer_phone: '(555) 234-5678',
-        customer_address: '456 Oak Ave, Springfield, IL',
-        scheduled_date: '2026-01-31',
-        scheduled_time: '11:30',
-        status: 'in_progress',
-        priority: 'high',
-        price: 350,
-        job_type: 'Repair',
-        assigned_to: ['Mike Johnson', 'Tom Wilson']
-      },
-      {
-        id: '3',
-        title: 'New Unit Installation',
-        customer_name: 'Bob Wilson',
-        customer_phone: '(555) 345-6789',
-        customer_address: '789 Pine Rd, Springfield, IL',
-        scheduled_date: '2026-02-01',
-        scheduled_time: '08:00',
-        status: 'scheduled',
-        priority: 'normal',
-        price: 4500,
-        job_type: 'Installation',
-        assigned_to: ['Team A']
-      },
-      {
-        id: '4',
-        title: 'Furnace Inspection',
-        customer_name: 'Alice Brown',
-        customer_phone: '(555) 456-7890',
-        customer_address: '321 Elm St, Springfield, IL',
-        scheduled_date: '2026-02-02',
-        scheduled_time: '14:00',
-        status: 'scheduled',
-        priority: 'low',
-        price: 89,
-        job_type: 'Inspection',
-        assigned_to: ['Sarah Davis']
-      },
-      {
-        id: '5',
-        title: 'Emergency Heating Repair',
-        customer_name: 'Chris Martin',
-        customer_phone: '(555) 567-8901',
-        customer_address: '654 Maple Dr, Springfield, IL',
-        scheduled_date: '2026-01-30',
-        scheduled_time: '16:00',
-        status: 'completed',
-        priority: 'urgent',
-        price: 275,
-        job_type: 'Repair',
-        assigned_to: ['Mike Johnson']
-      },
-    ])
+    async function fetchJobs() {
+      try {
+        const { data, error } = await supabase
+          .from('jobs')
+          .select(`
+            id,
+            title,
+            scheduled_date,
+            scheduled_time,
+            status,
+            priority,
+            price,
+            job_type_id,
+            assigned_to,
+            customers (
+              name,
+              phone,
+              address,
+              city,
+              state
+            ),
+            job_types (
+              name
+            )
+          `)
+          .order('scheduled_date', { ascending: true })
+
+        if (error) throw error
+
+        const formattedJobs = (data || []).map(job => ({
+          id: job.id,
+          title: job.title,
+          customer_name: job.customers?.name || 'Unknown',
+          customer_phone: job.customers?.phone || '',
+          customer_address: [job.customers?.address, job.customers?.city, job.customers?.state].filter(Boolean).join(', '),
+          scheduled_date: job.scheduled_date,
+          scheduled_time: job.scheduled_time,
+          status: job.status,
+          priority: job.priority,
+          price: job.price || 0,
+          job_type: job.job_types?.name || '',
+          assigned_to: job.assigned_to || []
+        }))
+
+        setJobs(formattedJobs)
+      } catch (error) {
+        console.error('Error fetching jobs:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchJobs()
   }, [])
 
   const filteredJobs = jobs.filter(job => {

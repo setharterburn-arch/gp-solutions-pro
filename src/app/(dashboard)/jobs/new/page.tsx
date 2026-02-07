@@ -174,15 +174,34 @@ export default function NewJobPage() {
     setLoading(true)
 
     try {
-      // TODO: API call to create job
-      console.log('Creating job:', formData)
-      
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 500))
+      const { data, error } = await supabase
+        .from('jobs')
+        .insert({
+          customer_id: formData.customer_id,
+          title: formData.title,
+          description: formData.description || null,
+          job_type_id: formData.job_type || null,
+          scheduled_date: formData.scheduled_date || null,
+          scheduled_time: formData.scheduled_time || null,
+          duration_hours: formData.duration_hours,
+          status: formData.scheduled_date ? 'scheduled' : 'unscheduled',
+          priority: formData.priority,
+          price: formData.price || null,
+          notes: formData.notes || null,
+          internal_notes: formData.internal_notes || null,
+          checklist: formData.checklist,
+          is_recurring: formData.is_recurring,
+          recurrence_pattern: formData.recurrence_pattern || null,
+        })
+        .select()
+        .single()
+
+      if (error) throw error
       
       router.push('/jobs')
     } catch (error) {
       console.error('Error creating job:', error)
+      alert('Failed to create job. Please try again.')
     } finally {
       setLoading(false)
     }

@@ -149,19 +149,43 @@ export default function NewInvoicePage() {
       sent_at: send ? new Date().toISOString() : null,
     }
 
-    console.log('Saving invoice:', invoiceData)
+    try {
+      // Generate invoice number
+      const { count } = await supabase
+        .from('invoices')
+        .select('*', { count: 'exact', head: true })
+      
+      const invoiceNumber = `INV-${new Date().getFullYear().toString().slice(-2)}${(new Date().getMonth() + 1).toString().padStart(2, '0')}-${((count || 0) + 1).toString().padStart(4, '0')}`
 
-    // TODO: API call to save invoice
-    // const res = await fetch('/api/invoices', {
-    //   method: 'POST',
-    //   headers: { 'Content-Type': 'application/json' },
-    //   body: JSON.stringify(invoiceData)
-    // })
+      const { data, error } = await supabase
+        .from('invoices')
+        .insert({
+          customer_id: invoice.customer_id,
+          job_id: invoice.job_id || null,
+          invoice_number: invoiceNumber,
+          line_items: lineItems.filter(item => item.description && item.total > 0),
+          subtotal,
+          tax_rate: 0,
+          tax_amount: tax,
+          total,
+          amount_paid: 0,
+          status: send ? 'sent' : 'draft',
+          due_date: invoice.due_date || null,
+          notes: invoice.notes || null,
+          sent_at: send ? new Date().toISOString() : null,
+        })
+        .select()
+        .single()
 
-    setTimeout(() => {
-      setSaving(false)
+      if (error) throw error
+      
       router.push('/invoices')
-    }, 1000)
+    } catch (error) {
+      console.error('Error saving invoice:', error)
+      alert('Failed to save invoice. Please try again.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (

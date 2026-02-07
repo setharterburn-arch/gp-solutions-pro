@@ -13,6 +13,7 @@ import {
   ArrowRight
 } from 'lucide-react'
 import { formatDate, formatCurrency, getStatusColor } from '@/lib/utils'
+import { supabase } from '@/lib/supabase'
 
 interface Estimate {
   id: string
@@ -38,51 +39,49 @@ export default function EstimatesPage() {
   const [estimates, setEstimates] = useState<Estimate[]>([])
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Mock data - replace with API call
-    setEstimates([
-      {
-        id: '1',
-        title: 'HVAC System Replacement',
-        customer_name: 'John Smith',
-        customer_email: 'john@example.com',
-        total: 8500,
-        status: 'sent',
-        valid_until: '2026-02-15',
-        created_at: '2026-01-25'
-      },
-      {
-        id: '2',
-        title: 'Annual Maintenance Contract',
-        customer_name: 'Tech Corp Inc.',
-        customer_email: 'service@techcorp.com',
-        total: 3600,
-        status: 'approved',
-        valid_until: '2026-02-28',
-        created_at: '2026-01-20'
-      },
-      {
-        id: '3',
-        title: 'AC Unit Repair',
-        customer_name: 'Jane Doe',
-        customer_email: 'jane@example.com',
-        total: 450,
-        status: 'draft',
-        valid_until: '2026-02-10',
-        created_at: '2026-01-29'
-      },
-      {
-        id: '4',
-        title: 'Ductwork Installation',
-        customer_name: 'Bob Wilson',
-        customer_email: 'bob@example.com',
-        total: 2200,
-        status: 'declined',
-        valid_until: '2026-01-30',
-        created_at: '2026-01-15'
-      },
-    ])
+    async function fetchEstimates() {
+      try {
+        const { data, error } = await supabase
+          .from('estimates')
+          .select(`
+            id,
+            title,
+            total,
+            status,
+            valid_until,
+            created_at,
+            customers (
+              name,
+              email
+            )
+          `)
+          .order('created_at', { ascending: false })
+
+        if (error) throw error
+
+        const formattedEstimates = (data || []).map(est => ({
+          id: est.id,
+          title: est.title,
+          customer_name: est.customers?.name || 'Unknown',
+          customer_email: est.customers?.email || '',
+          total: est.total,
+          status: est.status,
+          valid_until: est.valid_until,
+          created_at: est.created_at
+        }))
+
+        setEstimates(formattedEstimates)
+      } catch (error) {
+        console.error('Error fetching estimates:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchEstimates()
   }, [])
 
   const filteredEstimates = estimates.filter(estimate => {

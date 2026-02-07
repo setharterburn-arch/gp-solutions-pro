@@ -154,13 +154,35 @@ export default function NewEstimatePage() {
       sent_at: send ? new Date().toISOString() : null,
     }
 
-    console.log('Saving estimate:', estimateData)
+    try {
+      const { data, error } = await supabase
+        .from('estimates')
+        .insert({
+          customer_id: estimate.customer_id,
+          title: estimate.title,
+          description: estimate.notes || null,
+          line_items: lineItems.filter(item => item.description && item.total > 0),
+          subtotal,
+          tax_rate: 0,
+          tax_amount: tax,
+          total,
+          status: send ? 'sent' : 'draft',
+          valid_until: estimate.valid_until || null,
+          notes: estimate.terms || null,
+          sent_at: send ? new Date().toISOString() : null,
+        })
+        .select()
+        .single()
 
-    // TODO: API call to save estimate
-    setTimeout(() => {
-      setSaving(false)
+      if (error) throw error
+      
       router.push('/estimates')
-    }, 1000)
+    } catch (error) {
+      console.error('Error saving estimate:', error)
+      alert('Failed to save estimate. Please try again.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
