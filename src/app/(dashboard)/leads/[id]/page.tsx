@@ -17,6 +17,7 @@ import {
   Trash2
 } from 'lucide-react'
 import { formatCurrency, getStatusColor, formatDate } from '@/lib/utils'
+import { supabase } from '@/lib/supabase'
 
 interface Lead {
   id: string
@@ -47,25 +48,40 @@ export default function LeadDetailPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Mock data
-    setLead({
-      id: params.id as string,
-      name: 'Sarah Johnson',
-      email: 'sarah@example.com',
-      phone: '(555) 111-2222',
-      source: 'Website',
-      status: 'new',
-      estimated_value: 5000,
-      notes: 'Interested in full HVAC replacement. Current system is 15 years old and having efficiency issues. Wants quote for both standard and high-efficiency options.',
-      assigned_to: 'Mike Johnson',
-      created_at: '2026-01-30'
-    })
-    setLoading(false)
+    async function fetchLead() {
+      try {
+        const { data, error } = await supabase
+          .from('leads')
+          .select('*')
+          .eq('id', params.id)
+          .single()
+
+        if (error) throw error
+        setLead(data)
+      } catch (error) {
+        console.error('Error fetching lead:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchLead()
   }, [params.id])
 
-  const updateStatus = (newStatus: string) => {
+  const updateStatus = async (newStatus: string) => {
     if (!lead) return
-    setLead({ ...lead, status: newStatus })
+    
+    try {
+      const { error } = await supabase
+        .from('leads')
+        .update({ status: newStatus })
+        .eq('id', lead.id)
+
+      if (error) throw error
+      setLead({ ...lead, status: newStatus })
+    } catch (error) {
+      console.error('Error updating status:', error)
+    }
   }
 
   const convertToCustomer = () => {

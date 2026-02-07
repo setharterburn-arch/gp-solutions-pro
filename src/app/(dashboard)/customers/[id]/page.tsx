@@ -19,7 +19,8 @@ import {
   User,
   Building
 } from 'lucide-react'
-import { formatCurrency, getStatusColor } from '@/lib/utils'
+import { formatCurrency, getStatusColor, formatDate } from '@/lib/utils'
+import { supabase } from '@/lib/supabase'
 
 interface Customer {
   id: string
@@ -70,49 +71,85 @@ export default function CustomerDetailPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Mock data - replace with API call
-    setCustomer({
-      id: params.id as string,
-      name: 'John Smith',
-      company_name: null,
-      email: 'john@example.com',
-      phone: '(555) 123-4567',
-      alt_phone: '(555) 987-6543',
-      address: '123 Main St',
-      address2: null,
-      city: 'Springfield',
-      state: 'IL',
-      zip: '62701',
-      type: 'residential',
-      status: 'active',
-      tags: ['residential', 'vip'],
-      notes: 'Great customer, always pays on time. Has a large backyard with pool equipment.',
-      payment_terms: 'due_on_receipt',
-      tax_exempt: false,
-      total_jobs: 12,
-      total_revenue: 4580,
-      created_at: '2025-06-15'
-    })
+    async function fetchCustomerData() {
+      try {
+        // Fetch customer
+        const { data: customerData, error: customerError } = await supabase
+          .from('customers')
+          .select('*')
+          .eq('id', params.id)
+          .single()
 
-    setJobs([
-      { id: '1', title: 'AC Maintenance', status: 'completed', scheduled_date: '2026-01-15', price: 150 },
-      { id: '2', title: 'Furnace Repair', status: 'completed', scheduled_date: '2025-12-20', price: 320 },
-      { id: '3', title: 'Duct Cleaning', status: 'scheduled', scheduled_date: '2026-02-10', price: 280 },
-    ])
+        if (customerError) throw customerError
 
-    setInvoices([
-      { id: '1', number: 'INV-001', status: 'paid', date: '2026-01-15', total: 150 },
-      { id: '2', number: 'INV-002', status: 'paid', date: '2025-12-20', total: 320 },
-      { id: '3', number: 'INV-003', status: 'draft', date: '2026-02-10', total: 280 },
-    ])
+        // Fetch jobs for this customer
+        const { data: jobsData } = await supabase
+          .from('jobs')
+          .select('id, title, status, scheduled_date, price')
+          .eq('customer_id', params.id)
+          .order('scheduled_date', { ascending: false })
+          .limit(10)
 
-    setLoading(false)
+        // Fetch invoices for this customer
+        const { data: invoicesData } = await supabase
+          .from('invoices')
+          .select('id, invoice_number, status, created_at, total')
+          .eq('customer_id', params.id)
+          .order('created_at', { ascending: false })
+          .limit(10)
+
+        // Calculate totals
+        const totalJobs = jobsData?.length || 0
+        const totalRevenue = (invoicesData || [])
+          .filter(inv => inv.status === 'paid')
+          .reduce((sum, inv) => sum + (inv.total || 0), 0)
+
+        setCustomer({
+          ...customerData,
+          type: customerData.tags?.includes('commercial') ? 'commercial' : 'residential',
+          total_jobs: totalJobs,
+          total_revenue: totalRevenue
+        })
+
+        setJobs((jobsData || []).map(job => ({
+          id: job.id,
+          title: job.title,
+          status: job.status,
+          scheduled_date: job.scheduled_date,
+          price: job.price || 0
+        })))
+
+        setInvoices((invoicesData || []).map(inv => ({
+          id: inv.id,
+          number: inv.invoice_number,
+          status: inv.status,
+          date: inv.created_at,
+          total: inv.total || 0
+        })))
+      } catch (error) {
+        console.error('Error fetching customer:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchCustomerData()
   }, [params.id])
 
   const handleDelete = async () => {
     if (confirm('Are you sure you want to delete this customer? This action cannot be undone.')) {
-      // TODO: API call to delete customer
-      router.push('/customers')
+      try {
+        const { error } = await supabase
+          .from('customers')
+          .delete()
+          .eq('id', params.id)
+
+        if (error) throw error
+        router.push('/customers')
+      } catch (error) {
+        console.error('Error deleting customer:', error)
+        alert('Failed to delete customer. They may have associated jobs or invoices.')
+      }
     }
   }
 

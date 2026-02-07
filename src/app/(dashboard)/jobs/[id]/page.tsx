@@ -20,11 +20,13 @@ import {
   XCircle
 } from 'lucide-react'
 import { formatCurrency, getStatusColor, formatDate } from '@/lib/utils'
+import { supabase } from '@/lib/supabase'
 
 interface Job {
   id: string
   title: string
   description: string
+  customer_id: string
   customer_name: string
   customer_phone: string
   customer_address: string
@@ -45,44 +47,91 @@ export default function JobDetailPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Mock data
-    setJob({
-      id: params.id as string,
-      title: 'AC Maintenance',
-      description: 'Annual maintenance and filter replacement for central AC unit.',
-      customer_name: 'John Smith',
-      customer_phone: '(555) 123-4567',
-      customer_address: '123 Main St, Springfield, IL 62701',
-      status: 'scheduled',
-      priority: 'normal',
-      scheduled_date: '2026-02-10',
-      scheduled_time: '09:00',
-      duration_hours: 2,
-      price: 150,
-      notes: 'Customer prefers morning appointments. Has a dog - call before arriving.',
-      checklist: [
-        { id: '1', text: 'Inspect equipment', completed: false },
-        { id: '2', text: 'Clean/replace filters', completed: false },
-        { id: '3', text: 'Check refrigerant levels', completed: false },
-        { id: '4', text: 'Test operation', completed: false },
-      ]
-    })
-    setLoading(false)
+    async function fetchJob() {
+      try {
+        const { data, error } = await supabase
+          .from('jobs')
+          .select(`
+            *,
+            customers (
+              id,
+              name,
+              phone,
+              address,
+              city,
+              state,
+              zip
+            )
+          `)
+          .eq('id', params.id)
+          .single()
+
+        if (error) throw error
+
+        const customer = data.customers
+        const customerAddress = [customer?.address, customer?.city, customer?.state, customer?.zip].filter(Boolean).join(', ')
+
+        setJob({
+          id: data.id,
+          title: data.title,
+          description: data.description || '',
+          customer_id: data.customer_id,
+          customer_name: customer?.name || 'Unknown',
+          customer_phone: customer?.phone || '',
+          customer_address: customerAddress,
+          status: data.status,
+          priority: data.priority,
+          scheduled_date: data.scheduled_date,
+          scheduled_time: data.scheduled_time,
+          duration_hours: data.duration_hours || 1,
+          price: data.price || 0,
+          notes: data.notes || '',
+          checklist: data.checklist || []
+        })
+      } catch (error) {
+        console.error('Error fetching job:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchJob()
   }, [params.id])
 
-  const toggleChecklist = (itemId: string) => {
+  const toggleChecklist = async (itemId: string) => {
     if (!job) return
-    setJob({
-      ...job,
-      checklist: job.checklist.map(item =>
-        item.id === itemId ? { ...item, completed: !item.completed } : item
-      )
-    })
+    
+    const updatedChecklist = job.checklist.map(item =>
+      item.id === itemId ? { ...item, completed: !item.completed } : item
+    )
+    
+    setJob({ ...job, checklist: updatedChecklist })
+
+    // Save to database
+    try {
+      await supabase
+        .from('jobs')
+        .update({ checklist: updatedChecklist })
+        .eq('id', job.id)
+    } catch (error) {
+      console.error('Error updating checklist:', error)
+    }
   }
 
-  const updateStatus = (newStatus: string) => {
+  const updateStatus = async (newStatus: string) => {
     if (!job) return
-    setJob({ ...job, status: newStatus })
+    
+    try {
+      const { error } = await supabase
+        .from('jobs')
+        .update({ status: newStatus })
+        .eq('id', job.id)
+
+      if (error) throw error
+      setJob({ ...job, status: newStatus })
+    } catch (error) {
+      console.error('Error updating status:', error)
+    }
   }
 
   if (loading) {
@@ -93,7 +142,14 @@ export default function JobDetailPage() {
     )
   }
 
-  if (!job) return null
+  if (!job) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-gray-500">Job not found</p>
+        <Link href="/jobs" className="text-blue-600 hover:underline">Back to jobs</Link>
+      </div>
+    )
+  }
 
   const completedItems = job.checklist.filter(item => item.completed).length
 
@@ -109,7 +165,7 @@ export default function JobDetailPage() {
             <h1 className="text-2xl font-bold text-gray-900">{job.title}</h1>
             <div className="flex items-center gap-2 mt-1">
               <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${getStatusColor(job.status)}`}>
-                {job.status}
+                {job.status.replace('_', ' ')}
               </span>
               <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
                 job.priority === 'urgent' ? 'bg-red-100 text-red-700' :
@@ -171,7 +227,7 @@ export default function JobDetailPage() {
           )}
           {job.status === 'completed' && (
             <Link
-              href={`/invoices/new?job=${job.id}`}
+              href={`/invoices/new?job=${job.id}&customer=${job.customer_id}`}
               className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
             >
               <FileText size={18} />
@@ -193,32 +249,34 @@ export default function JobDetailPage() {
           )}
 
           {/* Checklist */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-semibold text-gray-900">Checklist</h2>
-              <span className="text-sm text-gray-500">
-                {completedItems}/{job.checklist.length} completed
-              </span>
+          {job.checklist.length > 0 && (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="font-semibold text-gray-900">Checklist</h2>
+                <span className="text-sm text-gray-500">
+                  {completedItems}/{job.checklist.length} completed
+                </span>
+              </div>
+              <div className="space-y-2">
+                {job.checklist.map((item) => (
+                  <label
+                    key={item.id}
+                    className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={item.completed}
+                      onChange={() => toggleChecklist(item.id)}
+                      className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    />
+                    <span className={item.completed ? 'text-gray-400 line-through' : 'text-gray-700'}>
+                      {item.text}
+                    </span>
+                  </label>
+                ))}
+              </div>
             </div>
-            <div className="space-y-2">
-              {job.checklist.map((item) => (
-                <label
-                  key={item.id}
-                  className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer"
-                >
-                  <input
-                    type="checkbox"
-                    checked={item.completed}
-                    onChange={() => toggleChecklist(item.id)}
-                    className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                  />
-                  <span className={item.completed ? 'text-gray-400 line-through' : 'text-gray-700'}>
-                    {item.text}
-                  </span>
-                </label>
-              ))}
-            </div>
-          </div>
+          )}
 
           {/* Notes */}
           {job.notes && (
@@ -237,11 +295,11 @@ export default function JobDetailPage() {
             <div className="space-y-3">
               <div className="flex items-center gap-3 text-gray-600">
                 <Calendar size={18} className="text-gray-400" />
-                <span>{formatDate(job.scheduled_date)}</span>
+                <span>{job.scheduled_date ? formatDate(job.scheduled_date) : 'Not scheduled'}</span>
               </div>
               <div className="flex items-center gap-3 text-gray-600">
                 <Clock size={18} className="text-gray-400" />
-                <span>{job.scheduled_time} ({job.duration_hours}h)</span>
+                <span>{job.scheduled_time || '--:--'} ({job.duration_hours}h)</span>
               </div>
             </div>
           </div>
@@ -252,18 +310,22 @@ export default function JobDetailPage() {
             <div className="space-y-3">
               <div className="flex items-center gap-3">
                 <User size={18} className="text-gray-400" />
-                <Link href="/customers/1" className="text-blue-600 hover:underline">
+                <Link href={`/customers/${job.customer_id}`} className="text-blue-600 hover:underline">
                   {job.customer_name}
                 </Link>
               </div>
-              <a href={`tel:${job.customer_phone}`} className="flex items-center gap-3 text-gray-600 hover:text-blue-600">
-                <Phone size={18} className="text-gray-400" />
-                <span>{job.customer_phone}</span>
-              </a>
-              <div className="flex items-start gap-3 text-gray-600">
-                <MapPin size={18} className="text-gray-400 mt-0.5" />
-                <span>{job.customer_address}</span>
-              </div>
+              {job.customer_phone && (
+                <a href={`tel:${job.customer_phone}`} className="flex items-center gap-3 text-gray-600 hover:text-blue-600">
+                  <Phone size={18} className="text-gray-400" />
+                  <span>{job.customer_phone}</span>
+                </a>
+              )}
+              {job.customer_address && (
+                <div className="flex items-start gap-3 text-gray-600">
+                  <MapPin size={18} className="text-gray-400 mt-0.5" />
+                  <span>{job.customer_address}</span>
+                </div>
+              )}
             </div>
           </div>
 
