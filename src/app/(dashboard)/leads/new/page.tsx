@@ -12,6 +12,7 @@ import {
   Globe,
   FileText
 } from 'lucide-react'
+import { supabase } from '@/lib/supabase'
 
 const sourceOptions = [
   'Website',
@@ -42,15 +43,27 @@ export default function NewLeadPage() {
     setLoading(true)
 
     try {
-      // TODO: API call to create lead
-      console.log('Creating lead:', formData)
-      
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 500))
+      const { data, error } = await supabase
+        .from('leads')
+        .insert({
+          name: formData.name,
+          email: formData.email || null,
+          phone: formData.phone || null,
+          source: formData.source || null,
+          estimated_value: formData.estimated_value ? parseFloat(formData.estimated_value) : null,
+          notes: formData.notes || null,
+          assigned_to: formData.assigned_to || null,
+          status: 'new'
+        })
+        .select()
+        .single()
+
+      if (error) throw error
       
       router.push('/leads')
     } catch (error) {
       console.error('Error creating lead:', error)
+      alert('Failed to create lead. Please try again.')
     } finally {
       setLoading(false)
     }

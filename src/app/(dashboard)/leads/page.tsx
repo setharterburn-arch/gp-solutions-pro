@@ -13,6 +13,7 @@ import {
   MoreVertical
 } from 'lucide-react'
 import { formatDate, formatCurrency, getStatusColor } from '@/lib/utils'
+import { supabase } from '@/lib/supabase'
 
 interface Lead {
   id: string
@@ -40,83 +41,26 @@ export default function LeadsPage() {
   const [leads, setLeads] = useState<Lead[]>([])
   const [search, setSearch] = useState('')
   const [view, setView] = useState<'pipeline' | 'list'>('pipeline')
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Mock data - replace with API call
-    setLeads([
-      {
-        id: '1',
-        name: 'Sarah Johnson',
-        email: 'sarah@example.com',
-        phone: '(555) 111-2222',
-        source: 'Website',
-        status: 'new',
-        estimated_value: 5000,
-        notes: 'Interested in full HVAC replacement',
-        assigned_to: 'Mike Johnson',
-        created_at: '2026-01-30'
-      },
-      {
-        id: '2',
-        name: 'Metro Office Building',
-        email: 'facilities@metro.com',
-        phone: '(555) 333-4444',
-        source: 'Referral',
-        status: 'contacted',
-        estimated_value: 25000,
-        notes: 'Commercial maintenance contract opportunity',
-        assigned_to: 'Sarah Davis',
-        created_at: '2026-01-28'
-      },
-      {
-        id: '3',
-        name: 'David Park',
-        email: 'david@example.com',
-        phone: '(555) 555-6666',
-        source: 'Google Ads',
-        status: 'qualified',
-        estimated_value: 3500,
-        notes: 'Needs AC replacement before summer',
-        assigned_to: 'Mike Johnson',
-        created_at: '2026-01-25'
-      },
-      {
-        id: '4',
-        name: 'Green Valley School',
-        email: 'admin@gvschool.edu',
-        phone: '(555) 777-8888',
-        source: 'Cold Call',
-        status: 'proposal',
-        estimated_value: 45000,
-        notes: 'Large school district - multi-building contract',
-        assigned_to: 'Tom Wilson',
-        created_at: '2026-01-20'
-      },
-      {
-        id: '5',
-        name: 'Jennifer Lee',
-        email: 'jennifer@example.com',
-        phone: '(555) 999-0000',
-        source: 'Website',
-        status: 'won',
-        estimated_value: 8500,
-        notes: 'Converted to customer',
-        assigned_to: 'Mike Johnson',
-        created_at: '2026-01-15'
-      },
-      {
-        id: '6',
-        name: 'Tom Roberts',
-        email: 'tom@example.com',
-        phone: '(555) 222-3333',
-        source: 'Referral',
-        status: 'lost',
-        estimated_value: 2000,
-        notes: 'Went with competitor - price sensitive',
-        assigned_to: 'Sarah Davis',
-        created_at: '2026-01-10'
-      },
-    ])
+    async function fetchLeads() {
+      try {
+        const { data, error } = await supabase
+          .from('leads')
+          .select('*')
+          .order('created_at', { ascending: false })
+
+        if (error) throw error
+        setLeads(data || [])
+      } catch (error) {
+        console.error('Error fetching leads:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchLeads()
   }, [])
 
   const filteredLeads = leads.filter(lead => 
