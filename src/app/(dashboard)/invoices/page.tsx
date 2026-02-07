@@ -72,7 +72,7 @@ export default function InvoicesPage() {
 
         if (error) throw error
 
-        const formattedInvoices = (data || []).map(inv => ({
+        const formattedInvoices = (data || []).map((inv: any) => ({
           id: inv.id,
           invoice_number: inv.invoice_number,
           customer_name: inv.customers?.name || 'Unknown',

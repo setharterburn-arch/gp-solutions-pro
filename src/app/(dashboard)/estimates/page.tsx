@@ -62,7 +62,7 @@ export default function EstimatesPage() {
 
         if (error) throw error
 
-        const formattedEstimates = (data || []).map(est => ({
+        const formattedEstimates = (data || []).map((est: any) => ({
           id: est.id,
           title: est.title,
           customer_name: est.customers?.name || 'Unknown',

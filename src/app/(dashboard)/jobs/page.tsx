@@ -79,7 +79,7 @@ export default function JobsPage() {
 
         if (error) throw error
 
-        const formattedJobs = (data || []).map(job => ({
+        const formattedJobs = (data || []).map((job: any) => ({
           id: job.id,
           title: job.title,
           customer_name: job.customers?.name || 'Unknown',
