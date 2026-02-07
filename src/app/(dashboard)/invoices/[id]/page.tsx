@@ -291,8 +291,8 @@ export default function InvoiceDetailPage() {
               <tr key={item.id || index} className="border-b border-gray-100">
                 <td className="py-4 text-gray-900">{item.description}</td>
                 <td className="py-4 text-right text-gray-600">{item.quantity}</td>
-                <td className="py-4 text-right text-gray-600">{formatCurrency(item.unit_price || item.rate)}</td>
-                <td className="py-4 text-right text-gray-900">{formatCurrency(item.total || item.amount)}</td>
+                <td className="py-4 text-right text-gray-600">{formatCurrency(item.unit_price || item.rate || 0)}</td>
+                <td className="py-4 text-right text-gray-900">{formatCurrency(item.total || item.amount || 0)}</td>
               </tr>
             ))}
           </tbody>
