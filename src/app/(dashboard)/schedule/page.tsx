@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, addWeeks, subWeeks, parseISO, addDays } from 'date-fns'
 import { formatTime, getStatusColor, getPriorityColor } from '@/lib/utils'
+import { supabase } from '@/lib/supabase'
 
 interface ScheduledJob {
   id: string
@@ -41,62 +42,64 @@ export default function SchedulePage() {
   const [dropTarget, setDropTarget] = useState<{ date: string; time?: string } | null>(null)
 
   useEffect(() => {
-    // Mock data - replace with API call
-    setJobs([
-      {
-        id: '1',
-        title: 'HVAC Maintenance',
-        customer_name: 'John Smith',
-        customer_address: '123 Main St',
-        scheduled_date: format(new Date(), 'yyyy-MM-dd'),
-        scheduled_time: '09:00',
-        end_time: '11:00',
-        status: 'scheduled',
-        priority: 'normal',
-        assigned_to: ['Mike Johnson'],
-        color: '#3b82f6'
-      },
-      {
-        id: '2',
-        title: 'AC Repair',
-        customer_name: 'Jane Doe',
-        customer_address: '456 Oak Ave',
-        scheduled_date: format(new Date(), 'yyyy-MM-dd'),
-        scheduled_time: '13:00',
-        end_time: '15:00',
-        status: 'scheduled',
-        priority: 'high',
-        assigned_to: ['Mike Johnson'],
-        color: '#f59e0b'
-      },
-      {
-        id: '3',
-        title: 'New Installation',
-        customer_name: 'Bob Wilson',
-        customer_address: '789 Pine Rd',
-        scheduled_date: format(addDays(new Date(), 1), 'yyyy-MM-dd'),
-        scheduled_time: '08:00',
-        end_time: '16:00',
-        status: 'scheduled',
-        priority: 'normal',
-        assigned_to: ['Team A'],
-        color: '#10b981'
-      },
-      {
-        id: '4',
-        title: 'Furnace Inspection',
-        customer_name: 'Alice Brown',
-        customer_address: '321 Elm St',
-        scheduled_date: format(addDays(new Date(), 2), 'yyyy-MM-dd'),
-        scheduled_time: '14:00',
-        end_time: '15:30',
-        status: 'scheduled',
-        priority: 'low',
-        assigned_to: ['Sarah Davis'],
-        color: '#8b5cf6'
-      },
-    ])
-  }, [])
+    async function fetchJobs() {
+      try {
+        // Get date range based on current view
+        let startDate: string, endDate: string
+        
+        if (view === 'month') {
+          const start = startOfMonth(currentDate)
+          const end = endOfMonth(currentDate)
+          startDate = format(start, 'yyyy-MM-dd')
+          endDate = format(end, 'yyyy-MM-dd')
+        } else if (view === 'week') {
+          const start = startOfWeek(currentDate)
+          const end = endOfWeek(currentDate)
+          startDate = format(start, 'yyyy-MM-dd')
+          endDate = format(end, 'yyyy-MM-dd')
+        } else {
+          startDate = format(currentDate, 'yyyy-MM-dd')
+          endDate = format(currentDate, 'yyyy-MM-dd')
+        }
+
+        const { data, error } = await supabase
+          .from('jobs')
+          .select(`
+            id, title, scheduled_date, scheduled_time, end_time, status, priority, assigned_to,
+            customers (name, address, city, state)
+          `)
+          .gte('scheduled_date', startDate)
+          .lte('scheduled_date', endDate)
+          .not('status', 'eq', 'cancelled')
+          .order('scheduled_date')
+          .order('scheduled_time')
+
+        if (error) throw error
+
+        const colors = ['#3b82f6', '#f59e0b', '#10b981', '#8b5cf6', '#ef4444', '#06b6d4']
+        
+        const formattedJobs = (data || []).map((job: any, index: number) => ({
+          id: job.id,
+          title: job.title,
+          customer_name: job.customers?.name || 'Unknown',
+          customer_address: [job.customers?.address, job.customers?.city, job.customers?.state].filter(Boolean).join(', '),
+          scheduled_date: job.scheduled_date,
+          scheduled_time: job.scheduled_time || '09:00',
+          end_time: job.end_time || '',
+          status: job.status,
+          priority: job.priority,
+          assigned_to: job.assigned_to || [],
+          color: colors[index % colors.length]
+        }))
+
+        setJobs(formattedJobs)
+      } catch (error) {
+        console.error('Error fetching schedule:', error)
+      }
+    }
+
+    fetchJobs()
+  }, [currentDate, view])
 
   const navigateDate = (direction: 'prev' | 'next') => {
     if (view === 'month') {

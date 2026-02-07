@@ -139,32 +139,45 @@ export default function EstimateDetailPage() {
     setGenerating(true)
     
     try {
-      const html2canvas = (await import('html2canvas')).default
-      const jsPDF = (await import('jspdf')).default
+      // Dynamic imports
+      const [html2canvasModule, jspdfModule] = await Promise.all([
+        import('html2canvas'),
+        import('jspdf')
+      ])
+      
+      const html2canvas = html2canvasModule.default
+      const jsPDF = jspdfModule.default
+
+      // Wait a tick for any pending renders
+      await new Promise(resolve => setTimeout(resolve, 100))
 
       const canvas = await html2canvas(printRef.current, {
         scale: 2,
         useCORS: true,
         logging: false,
-        backgroundColor: '#ffffff'
+        backgroundColor: '#ffffff',
+        allowTaint: true,
+        foreignObjectRendering: false
       })
 
-      const imgData = canvas.toDataURL('image/png')
+      const imgData = canvas.toDataURL('image/jpeg', 0.95)
       const pdf = new jsPDF('p', 'mm', 'a4')
       
       const pdfWidth = pdf.internal.pageSize.getWidth()
       const pdfHeight = pdf.internal.pageSize.getHeight()
       const imgWidth = canvas.width
       const imgHeight = canvas.height
-      const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight)
+      const ratio = Math.min((pdfWidth - 20) / imgWidth, (pdfHeight - 20) / imgHeight)
       const imgX = (pdfWidth - imgWidth * ratio) / 2
       const imgY = 10
 
-      pdf.addImage(imgData, 'PNG', imgX, imgY, imgWidth * ratio, imgHeight * ratio)
+      pdf.addImage(imgData, 'JPEG', imgX, imgY, imgWidth * ratio, imgHeight * ratio)
       pdf.save(`Estimate-${estimate.number}.pdf`)
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error generating PDF:', error)
-      alert('Failed to generate PDF. Please try again.')
+      // Fallback to print
+      alert('PDF generation failed. Opening print dialog instead.')
+      window.print()
     } finally {
       setGenerating(false)
     }
