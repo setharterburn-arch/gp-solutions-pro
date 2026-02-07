@@ -19,8 +19,10 @@ interface LineItem {
   id: string
   description: string
   quantity: number
-  unit_price: number
-  total: number
+  unit_price?: number
+  rate?: number
+  total?: number
+  amount?: number
 }
 
 interface Invoice {
