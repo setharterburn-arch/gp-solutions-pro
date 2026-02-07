@@ -48,11 +48,29 @@ export default function EstimateDetailPage() {
   const [estimate, setEstimate] = useState<Estimate | null>(null)
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
+  const [companyInfo, setCompanyInfo] = useState({
+    name: 'GP Solutions',
+    address: ''
+  })
   const printRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    async function fetchEstimate() {
+    async function fetchData() {
       try {
+        // Fetch settings
+        const { data: settingsData } = await supabase
+          .from('settings')
+          .select('company_name, company_address')
+          .single()
+        
+        if (settingsData) {
+          setCompanyInfo({
+            name: settingsData.company_name || 'GP Solutions',
+            address: settingsData.company_address || ''
+          })
+        }
+
+        // Fetch estimate
         const { data, error } = await supabase
           .from('estimates')
           .select(`
@@ -96,7 +114,7 @@ export default function EstimateDetailPage() {
       }
     }
 
-    fetchEstimate()
+    fetchData()
   }, [params.id])
 
   const updateStatus = async (newStatus: string) => {
@@ -280,9 +298,8 @@ export default function EstimateDetailPage() {
         {/* Header */}
         <div className="flex justify-between mb-8">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">GP Solutions</h2>
-            <p className="text-gray-500">Your Business Address</p>
-            <p className="text-gray-500">City, State ZIP</p>
+            <h2 className="text-2xl font-bold text-gray-900">{companyInfo.name}</h2>
+            {companyInfo.address && <p className="text-gray-500">{companyInfo.address}</p>}
           </div>
           <div className="text-right">
             <p className="text-3xl font-bold text-gray-900">ESTIMATE</p>

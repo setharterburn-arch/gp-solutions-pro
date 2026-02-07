@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { 
   Building, 
@@ -13,28 +13,114 @@ import {
   Star,
   Save,
   Check,
-  Settings
+  Settings,
+  Loader2
 } from 'lucide-react'
+import { supabase } from '@/lib/supabase'
 
 export default function SettingsPage() {
   const [saved, setSaved] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [settings, setSettings] = useState({
-    company_name: 'GP Solutions',
-    company_email: 'info@gpsolutions.com',
-    company_phone: '(555) 123-4567',
-    company_address: '123 Business St, Springfield, IL 62701',
-    default_tax_rate: 8.25,
+    id: '',
+    company_name: '',
+    company_email: '',
+    company_phone: '',
+    company_address: '',
+    default_tax_rate: 0,
     send_reminder_hours: 24,
     google_review_url: '',
-    stripe_enabled: false,
-    twilio_enabled: false,
   })
 
+  useEffect(() => {
+    async function fetchSettings() {
+      try {
+        const { data, error } = await supabase
+          .from('settings')
+          .select('*')
+          .single()
+
+        if (error && error.code !== 'PGRST116') throw error
+
+        if (data) {
+          setSettings({
+            id: data.id,
+            company_name: data.company_name || '',
+            company_email: data.company_email || '',
+            company_phone: data.company_phone || '',
+            company_address: data.company_address || '',
+            default_tax_rate: data.default_tax_rate || 0,
+            send_reminder_hours: data.send_reminder_hours || 24,
+            google_review_url: data.google_review_url || '',
+          })
+        }
+      } catch (error) {
+        console.error('Error fetching settings:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchSettings()
+  }, [])
+
   const handleSave = async () => {
-    // TODO: Save to Supabase
-    console.log('Saving settings:', settings)
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
+    setSaving(true)
+    
+    try {
+      if (settings.id) {
+        // Update existing
+        const { error } = await supabase
+          .from('settings')
+          .update({
+            company_name: settings.company_name,
+            company_email: settings.company_email,
+            company_phone: settings.company_phone,
+            company_address: settings.company_address,
+            default_tax_rate: settings.default_tax_rate,
+            send_reminder_hours: settings.send_reminder_hours,
+            google_review_url: settings.google_review_url,
+          })
+          .eq('id', settings.id)
+
+        if (error) throw error
+      } else {
+        // Insert new
+        const { data, error } = await supabase
+          .from('settings')
+          .insert({
+            company_name: settings.company_name,
+            company_email: settings.company_email,
+            company_phone: settings.company_phone,
+            company_address: settings.company_address,
+            default_tax_rate: settings.default_tax_rate,
+            send_reminder_hours: settings.send_reminder_hours,
+            google_review_url: settings.google_review_url,
+          })
+          .select()
+          .single()
+
+        if (error) throw error
+        if (data) setSettings({ ...settings, id: data.id })
+      }
+
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2000)
+    } catch (error) {
+      console.error('Error saving settings:', error)
+      alert('Failed to save settings. Please try again.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="animate-spin text-blue-600" size={32} />
+      </div>
+    )
   }
 
   return (
@@ -47,10 +133,11 @@ export default function SettingsPage() {
         </div>
         <button
           onClick={handleSave}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          disabled={saving}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
         >
-          {saved ? <Check size={20} /> : <Save size={20} />}
-          {saved ? 'Saved!' : 'Save Changes'}
+          {saved ? <Check size={20} /> : saving ? <Loader2 size={20} className="animate-spin" /> : <Save size={20} />}
+          {saved ? 'Saved!' : saving ? 'Saving...' : 'Save Changes'}
         </button>
       </div>
 
@@ -72,6 +159,7 @@ export default function SettingsPage() {
               type="text"
               value={settings.company_name}
               onChange={(e) => setSettings({ ...settings, company_name: e.target.value })}
+              placeholder="Your Company Name"
               className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
@@ -85,6 +173,7 @@ export default function SettingsPage() {
               type="email"
               value={settings.company_email}
               onChange={(e) => setSettings({ ...settings, company_email: e.target.value })}
+              placeholder="info@yourcompany.com"
               className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
@@ -98,6 +187,7 @@ export default function SettingsPage() {
               type="tel"
               value={settings.company_phone}
               onChange={(e) => setSettings({ ...settings, company_phone: e.target.value })}
+              placeholder="(555) 123-4567"
               className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
@@ -105,118 +195,67 @@ export default function SettingsPage() {
           <div className="md:col-span-2">
             <label className="block text-sm font-medium text-gray-700 mb-1">
               <MapPin className="inline mr-1" size={14} />
-              Address
+              Business Address
             </label>
             <input
               type="text"
               value={settings.company_address}
               onChange={(e) => setSettings({ ...settings, company_address: e.target.value })}
+              placeholder="123 Main St, City, State ZIP"
               className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
         </div>
       </div>
 
-      {/* Invoicing */}
+      {/* Invoice Settings */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <div className="flex items-center gap-3 mb-6">
           <div className="p-2 bg-green-100 rounded-lg">
             <CreditCard className="text-green-600" size={20} />
           </div>
-          <h2 className="text-lg font-semibold text-gray-900">Invoicing & Payments</h2>
+          <h2 className="text-lg font-semibold text-gray-900">Invoice Settings</h2>
         </div>
 
-        <div className="space-y-4">
-          <div className="max-w-xs">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Default Tax Rate (%)
             </label>
             <input
               type="number"
               step="0.01"
+              min="0"
+              max="100"
               value={settings.default_tax_rate}
-              onChange={(e) => setSettings({ ...settings, default_tax_rate: parseFloat(e.target.value) })}
+              onChange={(e) => setSettings({ ...settings, default_tax_rate: parseFloat(e.target.value) || 0 })}
               className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
 
-          <div className="pt-4 border-t border-gray-100">
-            <h3 className="font-medium text-gray-900 mb-3">Stripe Payments</h3>
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={settings.stripe_enabled}
-                onChange={(e) => setSettings({ ...settings, stripe_enabled: e.target.checked })}
-                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-              />
-              <span className="text-sm text-gray-700">Enable online payments via Stripe</span>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              <Bell className="inline mr-1" size={14} />
+              Reminder Before (hours)
             </label>
-            {settings.stripe_enabled && (
-              <div className="mt-3 p-4 bg-gray-50 rounded-lg">
-                <p className="text-sm text-gray-600 mb-2">
-                  Configure Stripe keys in environment variables:
-                </p>
-                <code className="text-xs bg-gray-200 px-2 py-1 rounded">STRIPE_SECRET_KEY</code>
-                <code className="text-xs bg-gray-200 px-2 py-1 rounded ml-2">NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY</code>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* SMS Reminders */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="p-2 bg-purple-100 rounded-lg">
-            <MessageSquare className="text-purple-600" size={20} />
-          </div>
-          <h2 className="text-lg font-semibold text-gray-900">SMS Reminders (Twilio)</h2>
-        </div>
-
-        <div className="space-y-4">
-          <label className="flex items-center gap-3 cursor-pointer">
             <input
-              type="checkbox"
-              checked={settings.twilio_enabled}
-              onChange={(e) => setSettings({ ...settings, twilio_enabled: e.target.checked })}
-              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+              type="number"
+              min="1"
+              value={settings.send_reminder_hours}
+              onChange={(e) => setSettings({ ...settings, send_reminder_hours: parseInt(e.target.value) || 24 })}
+              className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
-            <span className="text-sm text-gray-700">Enable SMS appointment reminders</span>
-          </label>
-
-          {settings.twilio_enabled && (
-            <>
-              <div className="max-w-xs">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Send reminder (hours before)
-                </label>
-                <input
-                  type="number"
-                  value={settings.send_reminder_hours}
-                  onChange={(e) => setSettings({ ...settings, send_reminder_hours: parseInt(e.target.value) })}
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-              <div className="p-4 bg-gray-50 rounded-lg">
-                <p className="text-sm text-gray-600 mb-2">
-                  Configure Twilio keys in environment variables:
-                </p>
-                <code className="text-xs bg-gray-200 px-2 py-1 rounded">TWILIO_ACCOUNT_SID</code>
-                <code className="text-xs bg-gray-200 px-2 py-1 rounded ml-2">TWILIO_AUTH_TOKEN</code>
-                <code className="text-xs bg-gray-200 px-2 py-1 rounded ml-2">TWILIO_PHONE_NUMBER</code>
-              </div>
-            </>
-          )}
+          </div>
         </div>
       </div>
 
-      {/* Reviews */}
+      {/* Review Link */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <div className="flex items-center gap-3 mb-6">
           <div className="p-2 bg-yellow-100 rounded-lg">
             <Star className="text-yellow-600" size={20} />
           </div>
-          <h2 className="text-lg font-semibold text-gray-900">Review Requests</h2>
+          <h2 className="text-lg font-semibold text-gray-900">Google Reviews</h2>
         </div>
 
         <div>
@@ -225,84 +264,43 @@ export default function SettingsPage() {
           </label>
           <input
             type="url"
-            placeholder="https://g.page/r/..."
             value={settings.google_review_url}
             onChange={(e) => setSettings({ ...settings, google_review_url: e.target.value })}
+            placeholder="https://g.page/r/..."
             className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
           <p className="text-sm text-gray-500 mt-1">
-            After completing a job, customers will be sent a link to leave a review.
+            Add your Google review link to include on invoices
           </p>
         </div>
       </div>
 
-      {/* Notifications */}
+      {/* Quick Links */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <div className="flex items-center gap-3 mb-6">
-          <div className="p-2 bg-orange-100 rounded-lg">
-            <Bell className="text-orange-600" size={20} />
+          <div className="p-2 bg-purple-100 rounded-lg">
+            <Settings className="text-purple-600" size={20} />
           </div>
-          <h2 className="text-lg font-semibold text-gray-900">Notifications</h2>
+          <h2 className="text-lg font-semibold text-gray-900">More Settings</h2>
         </div>
 
-        <div className="space-y-3">
-          <label className="flex items-center gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              defaultChecked
-              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-            />
-            <span className="text-sm text-gray-700">Email notifications for new jobs</span>
-          </label>
-          <label className="flex items-center gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              defaultChecked
-              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-            />
-            <span className="text-sm text-gray-700">Email notifications for payments received</span>
-          </label>
-          <label className="flex items-center gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              defaultChecked
-              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-            />
-            <span className="text-sm text-gray-700">Daily digest email</span>
-          </label>
-        </div>
-      </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Link
+            href="/settings/forms"
+            className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            <h3 className="font-medium text-gray-900">Custom Forms</h3>
+            <p className="text-sm text-gray-500">Manage booking forms and fields</p>
+          </Link>
 
-      {/* Quick Links */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Link
-          href="/settings/templates"
-          className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow"
-        >
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-purple-100 rounded-lg">
-              <Mail className="text-purple-600" size={20} />
-            </div>
-            <div>
-              <h3 className="font-semibold text-gray-900">Email & SMS Templates</h3>
-              <p className="text-sm text-gray-500">Customize automated messages</p>
-            </div>
-          </div>
-        </Link>
-        <Link
-          href="/settings/forms"
-          className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow"
-        >
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-teal-100 rounded-lg">
-              <Settings className="text-teal-600" size={20} />
-            </div>
-            <div>
-              <h3 className="font-semibold text-gray-900">Custom Job Forms</h3>
-              <p className="text-sm text-gray-500">Create checklists and forms</p>
-            </div>
-          </div>
-        </Link>
+          <Link
+            href="/settings/templates"
+            className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            <h3 className="font-medium text-gray-900">Email Templates</h3>
+            <p className="text-sm text-gray-500">Customize email templates</p>
+          </Link>
+        </div>
       </div>
     </div>
   )
